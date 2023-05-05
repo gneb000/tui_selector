@@ -1,10 +1,12 @@
 use std::cmp;
 use std::fmt::Display;
 use std::io::{Stdout, stdout, Write};
+use termion::event::Key;
 use termion::raw::{IntoRawMode, RawTerminal};
+use termion::input::TermRead;
 
 /// UI and control methods for a text based list item selector.
-pub struct SelectorTUI {
+struct SelectorTUI {
     entry_list: Vec<String>,
     stdout: RawTerminal<Stdout>,
     line_idx: usize,
@@ -62,8 +64,7 @@ impl SelectorTUI {
     /// line number (entry index in entry_list) to selection_tracker vector.
     pub fn toggle_selection(&mut self) {
         if self.sel_tracker.contains(&(self.line_idx + 1)) {
-            let index =
-                self.sel_tracker.iter().position(|&x| x == self.line_idx + 1).unwrap();
+            let index = self.sel_tracker.iter().position(|&x| x == self.line_idx + 1).unwrap();
             self.sel_tracker.remove(index);
         } else {
             self.sel_tracker.push(self.line_idx + 1);
@@ -71,21 +72,12 @@ impl SelectorTUI {
         self.move_down()
     }
 
-    /// Write selected entries to std out.
-    pub fn output_selection(&mut self) {
-        self.clear_scr();
-
-        // Retrieve and print each of the selected entries
-        for (line_num, sel_idx) in self.sel_tracker.iter().enumerate() {
-           write!(self.stdout,
-                   "{}{}{}{}\n",
-                   termion::cursor::Goto(1, (line_num + 1) as u16),
-                   termion::color::Fg(termion::color::Reset),
-                   termion::color::Bg(termion::color::Reset),
-                   self.entry_list[*sel_idx - 2].trim())
-                .unwrap();
+    /// Returns indices vector of selected entries.
+    pub fn retrieve_selection(&mut self) -> Option<Vec<usize>> {
+        if self.sel_tracker.is_empty() {
+            return None
         }
-        self.reset_terminal((self.sel_tracker.len() + 1) as u16);
+        Some(self.sel_tracker.iter().map(|i| i - 2).collect())
     }
 
     /// Clear screen, reset terminal format and set shell prompt position to the top.
@@ -199,4 +191,31 @@ impl SelectorTUI {
         }
         lines
     }
+}
+
+/// Returns selected indices, in relation to the provided vector, from the TUI selector.
+pub fn select(entry_list: Vec<String>) -> Option<Vec<usize>> {
+    let mut selection = None;
+
+    let mut tui_selector = SelectorTUI::new(entry_list);
+    tui_selector.refresh_content();
+    for c in termion::get_tty().unwrap().keys() {
+        match c.unwrap() {
+            Key::Char('q') | Key::Left | Key::Char('h') => {
+                tui_selector.quit();
+                break;
+            },
+            Key::Up | Key::Char('k') => tui_selector.move_up(),
+            Key::Down | Key::Char('j') => tui_selector.move_down(),
+            Key::Right | Key::Char('l') => tui_selector.toggle_selection(),
+            Key::Char('\n') => {
+                selection = tui_selector.retrieve_selection();
+                tui_selector.quit();
+                break;
+            },
+            _ => {}
+        }
+        tui_selector.refresh_content();
+    }
+    selection
 }
