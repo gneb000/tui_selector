@@ -72,6 +72,19 @@ impl SelectorTUI {
         self.move_down();
     }
 
+    /// Select all entries.
+    pub fn select_all(&mut self) {
+        self.sel_tracker.clear();
+        for idx in 0..self.entry_list.len() {
+            self.sel_tracker.push(idx + 2);
+        }
+    }
+
+    /// Deselect all entries.
+    pub fn select_none(&mut self) {
+        self.sel_tracker.clear();
+    }
+
     /// Returns indices vector of selected entries.
     pub fn retrieve_selection(&mut self) -> Option<Vec<usize>> {
         if self.sel_tracker.is_empty() {
@@ -84,6 +97,7 @@ impl SelectorTUI {
     pub fn quit(&mut self) {
         self.clear_scr();
         self.reset_terminal(1);
+        write!(self.stdout, "{}", termion::cursor::Show).unwrap();
     }
 
     /// Clear the screen, adjust cursor position to top-left, hide the cursor.
@@ -101,10 +115,11 @@ impl SelectorTUI {
     /// after printing output (if any) and closing.
     fn reset_terminal(&mut self, prompt_line: u16) {
         write!(self.stdout,
-               "{}{}{}{}",
-               termion::cursor::Goto(1, prompt_line),
+               "{}{}{}{}{}",
                termion::color::Fg(termion::color::Reset),
                termion::color::Bg(termion::color::Reset),
+               termion::clear::All,
+               termion::cursor::Goto(1, prompt_line),
                termion::cursor::Show)
             .unwrap();
     }
@@ -173,11 +188,13 @@ impl SelectorTUI {
         for (idx, entry) in self.entry_list.iter_mut().enumerate() {
             if self.sel_tracker.contains(&(idx+2)) {
                 lines.push(format!(
-                    "{}{}{} {}",
+                    "{}{}{} {}{}{}",
                     termion::color::Fg(termion::color::Black),
                     termion::color::Bg(termion::color::White),
                     if (idx+1) == self.line_idx {'>'} else {' '},
-                    entry
+                    entry,
+                    termion::color::Fg(termion::color::Reset),
+                    termion::color::Bg(termion::color::Reset)
                 ));
             } else {
                 lines.push(format!(
@@ -208,6 +225,8 @@ pub fn select(entry_list: Vec<String>) -> Option<Vec<usize>> {
             Key::Up | Key::Char('k') => tui_selector.move_up(),
             Key::Down | Key::Char('j') => tui_selector.move_down(),
             Key::Right | Key::Char('l') => tui_selector.toggle_selection(),
+            Key::Char('a') => tui_selector.select_all(),
+            Key::Char('n') => tui_selector.select_none(),
             Key::Char('\n') => {
                 selection = tui_selector.retrieve_selection();
                 tui_selector.quit();
