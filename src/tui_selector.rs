@@ -15,7 +15,7 @@ struct SelectorTUI {
 }
 
 impl SelectorTUI {
-    /// Create new instance of SelectorTUI with provided entry list as content.
+    /// Create new instance of `SelectorTUI` with provided entry list as content.
     pub fn new(entry_list: Vec<String>) -> SelectorTUI {
         SelectorTUI {
             entry_list,
@@ -29,9 +29,9 @@ impl SelectorTUI {
     /// Reloads the content to be displayed, clears the screen & draws the updated content.
     pub fn refresh_content(&mut self) {
         let content = self.make_content();
-        let lines_to_draw = self.calculate_lines_to_draw(content);
+        let lines_to_draw = self.calculate_lines_to_draw(&content);
         self.clear_scr();
-        self.draw_content(lines_to_draw);
+        self.draw_content(&lines_to_draw);
     }
 
     /// Moves the cursor down one line. If the bottom is reached, moves cursor to the top.
@@ -52,7 +52,7 @@ impl SelectorTUI {
 
     /// Moves the cursor the the last entry.
     pub fn go_bottom(&mut self) {
-        self.line_idx = self.entry_list.len() as usize;
+        self.line_idx = self.entry_list.len();
     }
 
     /// Moves the cursor to the first entry (below the header line).
@@ -61,7 +61,7 @@ impl SelectorTUI {
     }
 
     /// Toggle selected status of the entry in current line, by adding respective
-    /// line number (entry index in entry_list) to selection_tracker vector.
+    /// line number (entry index in `entry_list`) to `selection_tracker` vector.
     pub fn toggle_selection(&mut self) {
         if self.sel_tracker.contains(&(self.line_idx + 1)) {
             let index = self.sel_tracker.iter().position(|&x| x == self.line_idx + 1).unwrap();
@@ -69,7 +69,7 @@ impl SelectorTUI {
         } else {
             self.sel_tracker.push(self.line_idx + 1);
         }
-        self.move_down()
+        self.move_down();
     }
 
     /// Returns indices vector of selected entries.
@@ -110,9 +110,9 @@ impl SelectorTUI {
     }
 
     /// Iterate through content, drawing each line on screen, flush stdout at the end.
-    fn draw_content(&mut self, lines: Vec<String>) {
+    fn draw_content(&mut self, lines: &[String]) {
         for (num, line) in lines.iter().enumerate() {
-            self.write_line_stdout((num + 1) as u16, line);
+            self.write_line_stdout(num + 1, line);
         }
         self.stdout.flush().unwrap();
     }
@@ -120,7 +120,7 @@ impl SelectorTUI {
     /// Calculate amount of lines that fit in the screen, based on terminal height,
     /// and return vector slice with corresponding amount of content lines according
     /// to the scroll level.
-    fn calculate_lines_to_draw(&mut self, lines: Vec<String>) -> Vec<String> {
+    fn calculate_lines_to_draw(&mut self, lines: &[String]) -> Vec<String> {
         let term_size = termion::terminal_size().unwrap();
         let max_rows = (term_size.1 - 1) as usize;
 
@@ -138,10 +138,10 @@ impl SelectorTUI {
     }
 
     // Writes to std out the provided element to be displayed in the specified line number.
-    fn write_line_stdout(&mut self, line_num: u16, display_text: impl Display) {
+    fn write_line_stdout(&mut self, line_num: usize, display_text: impl Display) {
         write!(self.stdout,
                "{}{}",
-               termion::cursor::Goto(1, line_num),
+               termion::cursor::Goto(1, line_num as u16),
                display_text)
             .unwrap();
     }
@@ -201,7 +201,7 @@ pub fn select(entry_list: Vec<String>) -> Option<Vec<usize>> {
     tui_selector.refresh_content();
     for c in termion::get_tty().unwrap().keys() {
         match c.unwrap() {
-            Key::Char('q') | Key::Left | Key::Char('h') => {
+            Key::Left | Key::Char('q' | 'h') => {
                 tui_selector.quit();
                 break;
             },
