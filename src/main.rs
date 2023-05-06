@@ -3,6 +3,20 @@ mod tui_selector;
 use std::io::stdin;
 use std::process::exit;
 
+use clap::Parser;
+
+/// Text based list selector, reads a list from stdin and prints selected items to stdout
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Add line numbers
+    #[arg(short, long, action = clap::ArgAction::SetTrue)]
+    numbering: bool,
+    /// Provide list with format "ID::line\n", output selected IDs
+    #[arg(short, long, action = clap::ArgAction::SetTrue)]
+    id_mode: bool,
+}
+
 /// Returns the provided vector with respective line numbering at the beginning of each string.
 fn add_numbering(entry_list: &[String]) -> Vec<String> {
     entry_list
@@ -41,6 +55,8 @@ fn prepare_selector_content(input_stream: &[String], add_num: bool, id_out: bool
 }
 
 fn main() {
+    let args = Args::parse();
+
     // abort if no stdin pipe is provided
     if atty::is(atty::Stream::Stdin) {
         eprintln!("tui_selector: error: stdin buffer is empty, no input list provided.");
@@ -53,12 +69,7 @@ fn main() {
         .map(|l| l.unwrap().trim().to_string())
         .collect();
 
-    // TODO - Replace with CLAP args
-    let numbering = true;
-    let id_out = true;
-    // // // // // // // // // // //
-
-    let selector_content = prepare_selector_content(&input_stream, numbering, id_out);
+    let selector_content = prepare_selector_content(&input_stream, args.numbering, args.id_mode);
 
     let Ok(selected_indices) = tui_selector::select(selector_content) else {
         eprintln!("tui_selector: error: unable to access tty i/o.");
@@ -68,7 +79,7 @@ fn main() {
     if let Some(selection) = selected_indices {
         for i in selection {
             let mut item: &str = &input_stream[i];
-            if id_out {
+            if args.id_mode {
                 item = item.split_once("::").unwrap_or((item, "")).0;
             }
             println!("{item}");
