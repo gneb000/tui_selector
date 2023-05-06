@@ -3,7 +3,7 @@ mod tui_selector;
 use std::io::stdin;
 use std::process::exit;
 
-/// Returns teh provided vector with respective line numbering at the beginning of each string.
+/// Returns the provided vector with respective line numbering at the beginning of each string.
 fn add_numbering(entry_list: &[String]) -> Vec<String> {
     entry_list
         .iter()
@@ -41,7 +41,12 @@ fn prepare_selector_content(input_stream: &[String], add_num: bool, id_out: bool
 }
 
 fn main() {
-    // TODO > check stdin provided with atty or termion alternative
+    // abort if no stdin pipe is provided
+    if atty::is(atty::Stream::Stdin) {
+        eprintln!("tui_selector: error: stdin buffer is empty, no input list provided.");
+        exit(1);
+    }
+
     let input_stream: Vec<String> = stdin()
         .lines()
         .filter(Result::is_ok)
