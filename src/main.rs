@@ -3,7 +3,7 @@ mod tui_selector;
 use std::io::stdin;
 use std::process::exit;
 
-/// Returns provided vector with respective line numbering at the beginning of each string.
+/// Returns teh provided vector with respective line numbering at the beginning of each string.
 fn add_numbering(entry_list: &[String]) -> Vec<String> {
     entry_list
         .iter()
@@ -13,7 +13,7 @@ fn add_numbering(entry_list: &[String]) -> Vec<String> {
 }
 
 /// Returns string with padded number, adjusting string length with zeroes to the left of the
-/// provided number so the length matches the biggest number's length (also to be provided).
+/// provided number so the length matches the biggest number's length.
 fn get_num_str(n: usize, max_n: usize) -> String {
     let req_adj = max_n.to_string().len() - n.to_string().len();
     let mut adj_str: String = (1..=req_adj).map(|_| '0').collect();
