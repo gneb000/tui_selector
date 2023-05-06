@@ -171,7 +171,7 @@ impl SelectorTUI {
     /// Get String with header line showing 'tagged entry count / total entries' and keybindings.
     fn make_header_line(&mut self) -> String {
         format!(
-            "{}{} ({} selected / {} total)  [l/right:select  enter:run selection  q/h/left:quit] ",
+            "{}{} ({} selected / {} total)  [l/right:select  enter:run selection  q/h/left:quit  a:select all  n:deselect all] ",
             termion::color::Fg(termion::color::Black),
             termion::color::Bg(termion::color::White),
             self.sel_tracker.len(),

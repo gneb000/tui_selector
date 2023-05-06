@@ -4,26 +4,19 @@ use std::io::stdin;
 
 /// Returns provided vector with respective line numbering at the beginning of each string.
 fn add_numbering(entry_list: &[String]) -> Vec<String> {
-    let mut selector_content = Vec::new();
-    for (idx, entry) in entry_list.iter().enumerate() {
-        selector_content.push(format!(
-            " {} {}",
-            get_num_str(idx+1, entry_list.len()),
-            entry.clone(),
-        ));
-    }
-    selector_content
+    entry_list
+        .iter()
+        .enumerate()
+        .map(|(i, e)| format!(" {} {}", get_num_str(i+1, entry_list.len()), e.clone()))
+        .collect()
 }
 
 /// Returns string with padded number, adjusting string length with zeroes to the left of the
 /// provided number so the length matches the biggest number's length (also to be provided).
 fn get_num_str(n: usize, max_n: usize) -> String {
     let req_adj = max_n.to_string().len() - n.to_string().len();
-    let mut adj_str = String::new();
-    for _i in 1..=req_adj {
-        adj_str.push('0');
-    }
-    adj_str.push_str(n.to_string().as_str());
+    let mut adj_str: String = (1..=req_adj).map(|_| '0').collect();
+    adj_str.push_str(&n.to_string());
     adj_str
 }
 
