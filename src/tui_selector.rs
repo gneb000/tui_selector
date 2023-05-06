@@ -1,9 +1,10 @@
 use std::cmp;
+use std::error::Error;
 use std::fmt::Display;
-use std::io::{Stdout, stdout, Write};
+use std::io::{stdout, Stdout, Write};
 use termion::event::Key;
-use termion::raw::{IntoRawMode, RawTerminal};
 use termion::input::TermRead;
+use termion::raw::{IntoRawMode, RawTerminal};
 
 /// UI and control methods for a text based list item selector.
 struct SelectorTUI {
@@ -16,22 +17,24 @@ struct SelectorTUI {
 
 impl SelectorTUI {
     /// Create new instance of `SelectorTUI` with provided entry list as content.
-    pub fn new(entry_list: Vec<String>) -> SelectorTUI {
-        SelectorTUI {
+    pub fn new(entry_list: Vec<String>) -> Result<SelectorTUI, Box<dyn Error>> {
+        let selector = SelectorTUI {
             entry_list,
-            stdout: stdout().into_raw_mode().unwrap(),
+            stdout: stdout().into_raw_mode()?,
             line_idx: 1,
             sel_tracker: Vec::new(),
-            scroll_top: 0
-        }
+            scroll_top: 0,
+        };
+        Ok(selector)
     }
 
     /// Reloads the content to be displayed, clears the screen & draws the updated content.
-    pub fn refresh_content(&mut self) {
+    pub fn refresh_content(&mut self) -> Result<(), Box<dyn Error>> {
         let content = self.make_content();
         let lines_to_draw = self.calculate_lines_to_draw(&content);
-        self.clear_scr();
-        self.draw_content(&lines_to_draw);
+        self.clear_scr()?;
+        self.draw_content(&lines_to_draw)?;
+        Ok(())
     }
 
     /// Moves the cursor down one line. If the bottom is reached, moves cursor to the top.
@@ -64,8 +67,10 @@ impl SelectorTUI {
     /// line number (entry index in `entry_list`) to `selection_tracker` vector.
     pub fn toggle_selection(&mut self) {
         if self.sel_tracker.contains(&(self.line_idx + 1)) {
-            let index = self.sel_tracker.iter().position(|&x| x == self.line_idx + 1).unwrap();
-            self.sel_tracker.remove(index);
+            let idx_opt = self.sel_tracker.iter().position(|&x| x == self.line_idx + 1);
+            if let Some(index) = idx_opt {
+                self.sel_tracker.remove(index);
+            }
         } else {
             self.sel_tracker.push(self.line_idx + 1);
         }
@@ -88,55 +93,61 @@ impl SelectorTUI {
     /// Returns indices vector of selected entries.
     pub fn retrieve_selection(&mut self) -> Option<Vec<usize>> {
         if self.sel_tracker.is_empty() {
-            return None
+            return None;
         }
         Some(self.sel_tracker.iter().map(|i| i - 2).collect())
     }
 
     /// Clear screen, reset terminal format and set shell prompt position to the top.
-    pub fn quit(&mut self) {
-        self.clear_scr();
-        self.reset_terminal(1);
-        write!(self.stdout, "{}", termion::cursor::Show).unwrap();
+    pub fn quit(&mut self) -> Result<(), Box<dyn Error>> {
+        self.clear_scr()?;
+        self.reset_terminal(1)?;
+        write!(self.stdout, "{}", termion::cursor::Show)?;
+        Ok(())
     }
 
     /// Clear the screen, adjust cursor position to top-left, hide the cursor.
-    fn clear_scr(&mut self) {
-        write!(self.stdout,
-               "{}{}{}",
-               termion::clear::All,
-               termion::cursor::Goto(1, 1),
-               termion::cursor::Hide)
-            .unwrap();
+    fn clear_scr(&mut self) -> Result<(), Box<dyn Error>> {
+        write!(
+            self.stdout,
+            "{}{}{}",
+            termion::clear::All,
+            termion::cursor::Goto(1, 1),
+            termion::cursor::Hide
+        )?;
+        Ok(())
     }
 
     /// Restore cursor visibility and position before closing.
     /// Provide line number for the shell prompt to be positioned
     /// after printing output (if any) and closing.
-    fn reset_terminal(&mut self, prompt_line: u16) {
-        write!(self.stdout,
-               "{}{}{}{}{}",
-               termion::color::Fg(termion::color::Reset),
-               termion::color::Bg(termion::color::Reset),
-               termion::clear::All,
-               termion::cursor::Goto(1, prompt_line),
-               termion::cursor::Show)
-            .unwrap();
+    fn reset_terminal(&mut self, prompt_line: u16) -> Result<(), Box<dyn Error>> {
+        write!(
+            self.stdout,
+            "{}{}{}{}{}",
+            termion::color::Fg(termion::color::Reset),
+            termion::color::Bg(termion::color::Reset),
+            termion::clear::All,
+            termion::cursor::Goto(1, prompt_line),
+            termion::cursor::Show
+        )?;
+        Ok(())
     }
 
     /// Iterate through content, drawing each line on screen, flush stdout at the end.
-    fn draw_content(&mut self, lines: &[String]) {
+    fn draw_content(&mut self, lines: &[String]) -> Result<(), Box<dyn Error>> {
         for (num, line) in lines.iter().enumerate() {
-            self.write_line_stdout(num + 1, line);
+            self.write_line_stdout(num + 1, line)?;
         }
-        self.stdout.flush().unwrap();
+        self.stdout.flush()?;
+        Ok(())
     }
 
     /// Calculate amount of lines that fit in the screen, based on terminal height,
     /// and return vector slice with corresponding amount of content lines according
     /// to the scroll level.
     fn calculate_lines_to_draw(&mut self, lines: &[String]) -> Vec<String> {
-        let term_size = termion::terminal_size().unwrap();
+        let term_size = termion::terminal_size().unwrap_or((120, 40));
         let max_rows = (term_size.1 - 1) as usize;
 
         let cur_line = self.line_idx + 1;
@@ -153,17 +164,19 @@ impl SelectorTUI {
     }
 
     // Writes to std out the provided element to be displayed in the specified line number.
-    fn write_line_stdout(&mut self, line_num: usize, display_text: impl Display) {
-        write!(self.stdout,
-               "{}{}",
-               termion::cursor::Goto(1, line_num as u16),
-               display_text)
-            .unwrap();
+    fn write_line_stdout(&mut self, line_num: usize, display_text: impl Display) -> Result<(), Box<dyn Error>> {
+        write!(
+            self.stdout,
+            "{}{}",
+            termion::cursor::Goto(1, line_num as u16),
+            display_text
+        )?;
+        Ok(())
     }
 
     /// Joins header line and entry lines into a vector and returns it.
     fn make_content(&mut self) -> Vec<String> {
-        let mut lines = vec!(self.make_header_line());
+        let mut lines = vec![self.make_header_line()];
         lines.append(&mut self.make_entries_into_lines());
         lines
     }
@@ -183,15 +196,15 @@ impl SelectorTUI {
     /// including cursor character '>' positioned in the current line and with
     /// corresponding formatting (one color pair for regular entries and the
     /// reversed color pair for the header and selected entries).
-    fn make_entries_into_lines(&mut self) -> Vec<String>{
+    fn make_entries_into_lines(&mut self) -> Vec<String> {
         let mut lines = Vec::new();
         for (idx, entry) in self.entry_list.iter_mut().enumerate() {
-            if self.sel_tracker.contains(&(idx+2)) {
+            if self.sel_tracker.contains(&(idx + 2)) {
                 lines.push(format!(
                     "{}{}{} {}{}{}",
                     termion::color::Fg(termion::color::Black),
                     termion::color::Bg(termion::color::White),
-                    if (idx+1) == self.line_idx {'>'} else {' '},
+                    if (idx + 1) == self.line_idx { '>' } else { ' ' },
                     entry,
                     termion::color::Fg(termion::color::Reset),
                     termion::color::Bg(termion::color::Reset)
@@ -201,7 +214,7 @@ impl SelectorTUI {
                     "{}{}{} {}",
                     termion::color::Fg(termion::color::Reset),
                     termion::color::Bg(termion::color::Reset),
-                    if (idx+1) == self.line_idx {'>'} else {' '},
+                    if (idx + 1) == self.line_idx { '>' } else { ' ' },
                     entry
                 ));
             };
@@ -211,17 +224,17 @@ impl SelectorTUI {
 }
 
 /// Returns selected indices, in relation to the provided vector, from the TUI selector.
-pub fn select(entry_list: Vec<String>) -> Option<Vec<usize>> {
+pub fn select(entry_list: Vec<String>) -> Result<Option<Vec<usize>>, Box<dyn Error>> {
     let mut selection = None;
 
-    let mut tui_selector = SelectorTUI::new(entry_list);
-    tui_selector.refresh_content();
-    for c in termion::get_tty().unwrap().keys() {
-        match c.unwrap() {
+    let mut tui_selector = SelectorTUI::new(entry_list)?;
+    tui_selector.refresh_content()?;
+    for c in termion::get_tty()?.keys() {
+        match c? {
             Key::Left | Key::Char('q' | 'h') => {
-                tui_selector.quit();
+                tui_selector.quit()?;
                 break;
-            },
+            }
             Key::Up | Key::Char('k') => tui_selector.move_up(),
             Key::Down | Key::Char('j') => tui_selector.move_down(),
             Key::Right | Key::Char('l') => tui_selector.toggle_selection(),
@@ -229,12 +242,12 @@ pub fn select(entry_list: Vec<String>) -> Option<Vec<usize>> {
             Key::Char('n') => tui_selector.select_none(),
             Key::Char('\n') => {
                 selection = tui_selector.retrieve_selection();
-                tui_selector.quit();
+                tui_selector.quit()?;
                 break;
-            },
+            }
             _ => {}
         }
-        tui_selector.refresh_content();
+        tui_selector.refresh_content()?;
     }
-    selection
+    Ok(selection)
 }
